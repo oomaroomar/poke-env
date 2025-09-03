@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from enum import Enum, auto, unique
-from typing import Dict, Set
+from typing import Dict, Set, TypedDict
 
 
 @unique
@@ -1001,3 +1001,7 @@ _FROM_DATA: Dict[str, Effect] = {
     "YAWN": Effect.YAWN,
     "ZERO_TO_HERO": Effect.ZERO_TO_HERO,
 }
+
+class VolatileStatus(TypedDict):
+    effect: Effect
+    chance: float

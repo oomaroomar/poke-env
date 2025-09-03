@@ -37,6 +37,14 @@ class PokemonType(Enum):
     THREE_QUESTION_MARKS = auto()
     STELLAR = auto()
 
+    def index(self, include_special: bool = False) -> int:
+        """
+        Returns a stable 0-based index for this type.
+        """
+        if include_special:
+            return TYPE_TO_INDEX_EXTENDED[self]
+        return TYPE_TO_INDEX[self]
+
     def __str__(self) -> str:
         return f"{self.name} (pokemon type) object"
 
@@ -81,3 +89,30 @@ class PokemonType(Enum):
         if name == "???":
             return PokemonType.THREE_QUESTION_MARKS
         return PokemonType[name.upper()]
+
+STANDARD_TYPES = [
+    PokemonType.BUG,
+    PokemonType.DARK,
+    PokemonType.DRAGON,
+    PokemonType.ELECTRIC,
+    PokemonType.FAIRY,
+    PokemonType.FIGHTING,
+    PokemonType.FIRE,
+    PokemonType.FLYING,
+    PokemonType.GHOST,
+    PokemonType.GRASS,
+    PokemonType.GROUND,
+    PokemonType.ICE,
+    PokemonType.NORMAL,
+    PokemonType.POISON,
+    PokemonType.PSYCHIC,
+    PokemonType.ROCK,
+    PokemonType.STEEL,
+    PokemonType.WATER,
+    PokemonType.STELLAR,  
+]
+
+ALL_TYPES = STANDARD_TYPES + [PokemonType.THREE_QUESTION_MARKS]
+
+TYPE_TO_INDEX = {t: i for i, t in enumerate(STANDARD_TYPES)}
+TYPE_TO_INDEX_EXTENDED = {t: i for i, t in enumerate(ALL_TYPES)}

@@ -17,5 +17,23 @@ class Status(Enum):
     SLP = auto()
     TOX = auto()
 
+    def index(self):
+        return STATUS_TO_INDEX[self]
+
     def __str__(self) -> str:
         return f"{self.name} (status) object"
+
+STATUS_STRINGS = [
+    "brn",
+    "frz",
+    "psn",
+    "tox",
+    "par",
+    "slp",
+]
+
+STATUSES = [Status[s.upper()] for s in STATUS_STRINGS]
+
+STATUSES_W_FNT = STATUSES + [Status.FNT]
+
+STATUS_TO_INDEX = {sts: i for i, sts in enumerate(STATUSES_W_FNT)}

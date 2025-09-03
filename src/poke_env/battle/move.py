@@ -2,7 +2,7 @@ import copy
 from functools import lru_cache
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
-from poke_env.battle.effect import Effect
+from poke_env.battle.effect import Effect, VolatileStatus
 from poke_env.battle.field import Field
 from poke_env.battle.move_category import MoveCategory
 from poke_env.battle.pokemon_type import PokemonType
@@ -28,6 +28,9 @@ _PROTECT_MOVES = {
 }
 _SIDE_PROTECT_MOVES = {"wideguard", "quickguard", "matblock"}
 _PROTECT_COUNTER_MOVES = _PROTECT_MOVES | {"wideguard", "quickguard", "endure"}
+
+_ENEMY_TARGET = ["normal", "allAdjacentFoes"]
+
 
 
 class Move:
@@ -170,7 +173,40 @@ class Move:
         :return: Boosts conferred to the target by using the move.
         :rtype: Dict[str, float] | None
         """
-        return self.entry.get("boosts", None)
+        return self.boosts_self
+    
+    @property
+    def boosts_self(self) -> Optional[Dict[str, int]]:
+        """
+        Note: There is no standard format that boosts are encoded in the data. Some moves might still be missing.
+        :return: Boosts conferred to the user by using the move.
+        :rtype: Dict[str, int] | None
+        """
+        # Check for boosts in the most likely places, in order of precedence.
+        if self.entry.get("target") == "self" and "boosts" in self.entry: # e.g. swords dance
+            return self.entry.get("boosts", None)
+        boosts = (
+            self.entry.get("secondary", {})
+            .get("self", {})
+            .get("boosts")
+        ) # e.g. flame charge
+        return boosts or self.entry.get("self", {}).get("boosts", None) # e.g. close combat
+
+
+    @property
+    def boosts_target(self) -> Optional[Dict[str, int]]:
+        """
+        :return: Boosts conferred to the target by using the move.
+        :rtype: Dict[str, int] | None
+        """
+        if self.entry.get("target") in _ENEMY_TARGET and "boosts" in self.entry: # e.g. tickle, growl
+            return self.entry.get("boosts", None)
+        boosts = (
+            self.entry.get("secondary", {})
+            .get("boosts", None)
+        ) # e.g. snarl
+        return boosts
+
 
     @property
     def breaks_protect(self) -> bool:
@@ -561,7 +597,7 @@ class Move:
         return []
 
     @property
-    def self_boost(self) -> Optional[Dict[str, int]]:
+    def self_boost(self) -> Optional[Dict[str, int]]: # Doesn't include stat boosts from secondaries (ominous wind, ancient power)
         """
         :return: Boosts applied to the move's user.
         :rtype: Dict[str, int]
@@ -671,6 +707,15 @@ class Move:
         return self.entry.get("thawsTarget", False)
 
     @property
+    def thaws_user(self) -> bool:
+        """
+        :return: Whether the move thaws its user.
+        :rtype: bool
+        """
+        return self.entry.get("flags", {}).get("defrost", False) == 1
+    
+
+    @property
     def type(self) -> PokemonType:
         """
         :return: Move type.
@@ -687,23 +732,23 @@ class Move:
         return self.entry.get("overrideOffensivePokemon", False) == "target"
 
     @property
-    def volatile_status(self) -> Optional[Effect]:
+    def volatile_status(self) -> Optional[VolatileStatus]:
         """
         :return: Volatile status inflicted by the move.
-        :rtype: Effect | None
+        :rtype: VolatileStatus | None
         """
         vs = self.entry.get("volatileStatus", None)
         if vs is not None:
-            vs = Effect.from_data(vs)
+            vs = VolatileStatus(effect=Effect.from_data(vs), chance=1.0)
         elif self.secondary:
             for s in self.secondary:
                 if "volatileStatus" in s:
-                    vs = Effect.from_data(s.get("volatileStatus", ""))
+                    vs = VolatileStatus(effect=Effect.from_data(s.get("volatileStatus", "")), chance=s.get("chance", 100) / 100.0)
         elif self.entry.get("self", None):
             if "volatileStatus" in self.entry.get("self", {}):
-                vs = Effect.from_data(
+                vs = VolatileStatus(effect=Effect.from_data(
                     self.entry.get("self", {}).get("volatileStatus", "")
-                )
+                ), chance=1.0)
         return vs
 
     @property
