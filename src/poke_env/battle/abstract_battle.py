@@ -1274,6 +1274,10 @@ class AbstractBattle(ABC):
         else:
             return {mon.species: mon for mon in self._teampreview_opponent_team}
 
+    @opponent_team.setter
+    def opponent_team(self, value: Dict[str, Pokemon]):
+        self._opponent_team = value
+
     @property
     def opponent_used_dynamax(self) -> bool:
         """

@@ -176,7 +176,7 @@ class Move:
         return self.boosts_self
     
     @property
-    def boosts_self(self) -> Optional[Dict[str, int]]:
+    def boosts_self(self) -> Dict[str, int]:
         """
         Note: There is no standard format that boosts are encoded in the data. Some moves might still be missing.
         :return: Boosts conferred to the user by using the move.
@@ -184,26 +184,27 @@ class Move:
         """
         # Check for boosts in the most likely places, in order of precedence.
         if self.entry.get("target") == "self" and "boosts" in self.entry: # e.g. swords dance
-            return self.entry.get("boosts", None)
+            return self.entry.get("boosts") or {}
         boosts = (
-            self.entry.get("secondary", {})
-            .get("self", {})
-            .get("boosts")
+            self.entry.get("secondary") or {}
+            .get("self") or {}
+            .get("boosts") or {}
         ) # e.g. flame charge
-        return boosts or self.entry.get("self", {}).get("boosts", None) # e.g. close combat
+        return boosts or (self.entry.get("self") or {}).get("boosts") or {} # e.g. close combat
 
 
     @property
-    def boosts_target(self) -> Optional[Dict[str, int]]:
+    def boosts_target(self) -> Dict[str, int]:
         """
         :return: Boosts conferred to the target by using the move.
         :rtype: Dict[str, int] | None
         """
         if self.entry.get("target") in _ENEMY_TARGET and "boosts" in self.entry: # e.g. tickle, growl
-            return self.entry.get("boosts", None)
+            return self.entry.get("boosts") or {}
         boosts = (
-            self.entry.get("secondary", {})
-            .get("boosts", None)
+            self.entry.get("secondary") or {}
+            .get("self") or {}
+            .get("boosts") or {}
         ) # e.g. snarl
         return boosts
 
@@ -732,19 +733,40 @@ class Move:
         return self.entry.get("overrideOffensivePokemon", False) == "target"
 
     @property
-    def volatile_status(self) -> Optional[VolatileStatus]:
+    def volatile_status(self) -> Optional[Effect]:
         """
         :return: Volatile status inflicted by the move.
-        :rtype: VolatileStatus | None
+        :rtype: Effect | None
         """
         vs = self.entry.get("volatileStatus", None)
         if vs is not None:
-            vs = VolatileStatus(effect=Effect.from_data(vs), chance=1.0)
+            vs = Effect.from_data(vs)
         elif self.secondary:
             for s in self.secondary:
                 if "volatileStatus" in s:
-                    vs = VolatileStatus(effect=Effect.from_data(s.get("volatileStatus", "")), chance=s.get("chance", 100) / 100.0)
+                    vs = Effect.from_data(s.get("volatileStatus", ""))
         elif self.entry.get("self", None):
+            if "volatileStatus" in self.entry.get("self", {}):
+                vs = Effect.from_data(
+                    self.entry.get("self", {}).get("volatileStatus", "")
+                )
+        return vs
+
+    @property
+    def volatile_status_chance(self) -> Optional[VolatileStatus]:
+        """
+        :return: Chance of the volatile status.
+        :rtype: VolatileStatus | None
+        """
+
+        vs = self.entry.get("volatileStatus", None)
+        if vs is not None:
+            vs = VolatileStatus(effect=Effect.from_data(vs), chance=1.0)
+        elif self.secondary: # e.g. strange steam
+            for s in self.secondary:
+                if "volatileStatus" in s:
+                    vs = VolatileStatus(effect=Effect.from_data(s.get("volatileStatus", "")), chance=s.get("chance", 100) / 100.0)
+        elif self.entry.get("self", None): # not sure which moves are covered by this (but its included in the original source code, so not removing)
             if "volatileStatus" in self.entry.get("self", {}):
                 vs = VolatileStatus(effect=Effect.from_data(
                     self.entry.get("self", {}).get("volatileStatus", "")

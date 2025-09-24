@@ -108,6 +108,7 @@ class PokeEnv(ParallelEnv[str, ObsType, ActionType]):
     _TIME_BETWEEN_RETRIES = 0.5
     _SWITCH_CHALLENGE_TASK_RETRIES = 30
     _TIME_BETWEEN_SWITCH_RETRIES = 1
+    _INVALID_MOVE_PENALTY = 3
 
     def __init__(
         self,
@@ -247,15 +248,28 @@ class PokeEnv(ParallelEnv[str, ObsType, ActionType]):
         assert self.battle2 is not None
         assert not self.battle1.finished
         assert not self.battle2.finished
+        selectedInvalidMove = False
         if self.agent1_to_move:
             self.agent1_to_move = False
-            order1 = self.action_to_order(
-                actions[self.agents[0]],
-                self.battle1,
-                fake=self.fake,
-                strict=self.strict,
-            )
-            self.agent1.order_queue.put(order1)
+            try:
+                order1 = self.action_to_order(
+                    actions[self.agents[0]],
+                    self.battle1,
+                    fake=self.fake,
+                    strict=self.strict,
+                )
+                self.agent1.order_queue.put(order1)
+            except ValueError as e:
+                if self.strict:
+                    raise e
+                else:
+                    if self.battle1.logger is not None:
+                        self.battle1.logger.warning(
+                            str(e) + " Defaulting to random move. Adding penalty."
+                        )
+                    order1 = Player.choose_random_singles_move(self.battle1)
+                    selectedInvalidMove = True
+                    self.agent1.order_queue.put(order1)
         if self.agent2_to_move:
             self.agent2_to_move = False
             order2 = self.action_to_order(
@@ -286,7 +300,8 @@ class PokeEnv(ParallelEnv[str, ObsType, ActionType]):
             self.agents[1]: self.embed_battle(battle2),
         }
         reward = {
-            self.agents[0]: self.calc_reward(battle1),
+            self.agents[0]: self.calc_reward(battle1)
+            - self._INVALID_MOVE_PENALTY * selectedInvalidMove,
             self.agents[1]: self.calc_reward(battle2),
         }
         term1, trunc1 = self.calc_term_trunc(battle1)
